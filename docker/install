@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# Install web services to a target file system.
+#
+
+target=$1
+
+if [ -z "${target}" -o ! -d "${target}" ]; then
+  echo "Error: Must provide the full path to target filesystem"
+  exit 1
+fi
+
+# copy NGINX configuration
+cp -rp /etc/nginx/conf.d/default.conf "${target}"/etc/nginx/conf.d/default.conf
+
+# copy sample web services
+cp -rp /vagrant/services "${target}"/opt/.
+
+# initial start up script for Docker
+tee -a "${target}"/opt/startapp << END
+systemctl start rabbitmq-server
+systemctl start nginx
+
+echo "Restarting backend service: time"
+sudo -u vagrant nohup node /opt/services/time/server.js > /tmp/time.log &
+
+echo "Restarting backend service: random"
+sudo -u vagrant nohup node /opt/services/random/server.js > /tmp/random.log &
+END
+chmod 755 "${target}"/opt/startapp

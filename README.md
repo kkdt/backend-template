@@ -55,3 +55,9 @@ Backend developers can update the baseline with new services or update existing 
 3. https://nodejs.org/en/docs/guides/getting-started-guide/
 
 4. https://docs.bit.dev/docs/bit-server
+
+5. https://github.com/moby/moby/blob/master/contrib/mkimage-yum.sh
+
+6. https://stackoverflow.com/questions/26153686/how-do-i-run-a-command-on-an-already-existing-docker-container
+
+7. https://github.com/docker/for-linux/issues/561

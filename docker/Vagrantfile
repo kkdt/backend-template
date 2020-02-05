@@ -12,14 +12,13 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
-  config.vm.box = "kkdt/g7dev"
-  config.vm.box_version = "0.1"
-  config.vm.define "g7dev"
-  config.vm.hostname = "g7dev"
+  config.vm.box = "geerlingguy/centos7"
+  config.vm.define "docker"
+  config.vm.hostname = "docker"
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
-    vb.name = "g7dev"
+    vb.name = "docker"
     vb.memory = 1024
     vb.cpus = 1
   end
@@ -36,54 +35,22 @@ Vagrant.configure("2") do |config|
   # couchdb
   config.vm.network "forwarded_port", host: 5003, guest: 5984
 
-  # Copy all configuration files to guest machine
-  config.vm.provision "file", source: "config/nginx.conf", destination: "/tmp/config/nginx.conf"
-
-  # Update NGINX configuration
-  config.vm.provision "config", type: "shell", inline: <<-SHELL
-    epoch=$(date +%s)
-
-    echo "Copying NGINX configuration"
-    if [ -f /etc/nginx/conf.d/default.conf ]; then
-      sudo cp -rp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.${epoch}
-    fi
-    sudo cp -f /tmp/config/nginx.conf /etc/nginx/conf.d/default.conf
-    systemctl restart nginx.service
-    systemctl status nginx.service
-  SHELL
 
   # Update new software/cots as needed rather than rebuilding the box image.
-  config.vm.provision "software", type: "shell", inline: <<-SHELL
-    # node
-    npm -g install express
-    npm -g install http-server
-
-    # docker installation
+  config.vm.provision "docker", type: "shell", inline: <<-SHELL
     yum install -y docker
     systemctl start docker
     systemctl enable docker
+
+    if [ -f "/vagrant/g7dev.tar" ]; then
+      echo "Importing /vagrant/g7dev.tar Docker image"
+      docker import /vagrant/g7dev.tar g7dev:latest
+    fi
+
+    # docker image build -t bulletinboard:1.1 .
+    # docker run -it -d g7dev  /bin/bash
+    # docker run -it -d g7dev /bin/bash /opt/startapp
   SHELL
-
-  # Start up the backend services
-  config.vm.provision "restart-services", type: "shell", inline: <<-SHELL
-    echo "Restarting backend service: time"
-    sudo -u vagrant nohup node /vagrant/services/time/server.js > time.log &
-
-    echo "Restarting backend service: random"
-    sudo -u vagrant nohup node /vagrant/services/random/server.js > random.log &
-  SHELL
-
-  # By default, this is never run unless the provision is explicitly specified.
-  config.vm.provision "restart-cots", run: "never", type: "shell", inline: <<-SHELL
-    echo "Restarting nginx"
-    systemctl restart nginx.service
-    systemctl status nginx.service
-
-    echo "Restarting RabbitMQ"
-    systemctl restart rabbitmq-server.service
-    systemctl status rabbitmq-server.service
-  SHELL
-
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
