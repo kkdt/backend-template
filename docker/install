@@ -18,13 +18,27 @@ cp -rp /vagrant/services "${target}"/opt/.
 
 # initial start up script for Docker
 tee -a "${target}"/opt/startapp << END
-systemctl start rabbitmq-server
-systemctl start nginx
+#!/bin/bash
+
+# turn on bash's job control
+set -m
+
+echo "Starting RabbitMQ"
+/sbin/rabbitmq-server &
+echo "Starting couchdb"
+/opt/couchdb/bin/couchdb &
+echo "Starting NGINX"
+/sbin/nginx
 
 echo "Restarting backend service: time"
-sudo -u vagrant nohup node /opt/services/time/server.js > /tmp/time.log &
+/bin/node /opt/services/time/server.js &
 
 echo "Restarting backend service: random"
-sudo -u vagrant nohup node /opt/services/random/server.js > /tmp/random.log &
+/bin/node /opt/services/random/server.js &
+
+# the primary process is rabbitmq and bring it to the foreground, leaving it there
+# indefinitely
+fg %1
 END
 chmod 755 "${target}"/opt/startapp
+chown root:root -Rf "${target}"/opt/*

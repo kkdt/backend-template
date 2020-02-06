@@ -2,6 +2,8 @@
 #
 # Reference: https://github.com/moby/moby/blob/master/contrib/mkimage-yum.sh
 #
+# NOTE: IMPORTING THE DOCKER IMAGE MUST USE 'docker load --input /path/to/tar.gz'
+
 if [[ $EUID -ne 0 ]]; then
   echo "This script must be run as root"
   exit 1
@@ -155,7 +157,8 @@ if [ "${doimport}" == "true" ]; then
 
   if [ "${save}" == "true" ]; then
     echo "Saving docker ${reponame}:${version} to ${saveoutput}"
-    docker save -o ${saveoutput} ${reponame}:${version}
+    docker save ${reponame}:${version} | gzip > ${saveoutput}
+    #docker save -o ${saveoutput} ${reponame}:${version}
   fi
 else
   rm -rf ${target}

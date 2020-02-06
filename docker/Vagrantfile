@@ -28,23 +28,27 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", host: 8000, guest: 3000
 
   # Used for direct access to backend services
-  config.vm.network "forwarded_port", host: 5000, guest: 9000
-  config.vm.network "forwarded_port", host: 5001, guest: 9001
+  #config.vm.network "forwarded_port", host: 5000, guest: 9000
+  #config.vm.network "forwarded_port", host: 5001, guest: 9001
   # rabbitmq
   config.vm.network "forwarded_port", host: 5002, guest: 15672
   # couchdb
-  config.vm.network "forwarded_port", host: 5003, guest: 5984
+  #config.vm.network "forwarded_port", host: 5003, guest: 5984
 
 
   # Update new software/cots as needed rather than rebuilding the box image.
   config.vm.provision "docker", type: "shell", inline: <<-SHELL
-    yum install -y docker
+    # yum install -y docker
+    curl -fsSL https://get.docker.com/ | sh
     systemctl start docker
     systemctl enable docker
 
-    if [ -f "/vagrant/g7dev.tar" ]; then
-      echo "Importing /vagrant/g7dev.tar Docker image"
-      docker import /vagrant/g7dev.tar g7dev:latest
+    if [ -f "/vagrant/g7dev.tar.gz" ]; then
+      echo "Loading /vagrant/g7dev.tar.gz Docker image"
+      #docker import /vagrant/g7dev.tar g7dev:latest
+      docker load --input /vagrant/g7dev.tar.gz
+      echo "Starting /opt/startapp in Docker container"
+      docker run -it --name g7dev --rm -d -p 3000:3000 -p 15672:15672 --hostname g7dev g7dev /opt/startapp
     fi
 
     # docker image build -t bulletinboard:1.1 .
