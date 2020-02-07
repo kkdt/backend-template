@@ -72,7 +72,6 @@ if [ -f "${name}" ]; then
   source "${name}"
 else
   imagename="$(echo "${name//\//$''}")"
-  packages=("kernel.x86_64" "yum.noarch")
 fi
 
 if [ -z "${imagename}" ]; then
@@ -83,6 +82,10 @@ fi
 target=$(mktemp -d --tmpdir $(basename $0).XXXXXX)
 
 set -x
+
+if [ -z "${packages}" -a -z "${rpms}" -a -z "${scripts}" ]; then
+  packages=("kernel.x86_64" "yum.noarch")
+fi
 
 #-------------------------------------------------------------------------------
 # Install packages
