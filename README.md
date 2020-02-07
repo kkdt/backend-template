@@ -21,6 +21,7 @@ The first step would be to do the leg work to build out a virtual machine with a
 - Apache CouchDB 2.3.1
 - RabbitMQ 3.3.5
 - NGINX 1.16.1
+- Docker Client (1.13.1), API (1.26)
 
 # Quick Start
 

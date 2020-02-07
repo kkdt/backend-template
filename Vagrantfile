@@ -59,8 +59,8 @@ Vagrant.configure("2") do |config|
     npm -g install http-server
 
     # docker installation
-    #yum install -y docker
-    curl -fsSL https://get.docker.com/ | sh
+    yum install -y docker
+    # curl -fsSL https://get.docker.com/ | sh
     systemctl start docker
     systemctl enable docker
   SHELL

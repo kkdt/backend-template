@@ -16,11 +16,13 @@ timenow=$(date +%s)
 set -e
 
 function usage() {
-  echo "$(basename $0) [options] /path/to/imgenv"
+  echo "$(basename $0) [options] imagename|/path/to/imgenv"
   echo "  imgenv             The full path to the imgenv file"
+  echo "  imagename          Build the image using defaults and the specified imagename (i.e. the base OS)"
+  echo "Options"
   echo "  -y  <yum.conf>     The full path to the yum.conf - default to /etc/yum.conf"
   echo "  -t  <tag>          Tag name - default 'latest'"
-  echo "  -s  <imgfile>      Full path to output file (i.e. docker save -o /tmp/g7dev.tar)"
+  echo "  -s  <imgfile>      Import the image into Docker and perform a 'docker save' of image to imgfile (i.e. /tmp/image.tar.gz)."
   echo "  -h                 Print the help message"
   exit 1
 }
@@ -62,14 +64,19 @@ done
 shift $((OPTIND - 1))
 
 name=$1
-if [ -z "${name}" -o ! -f "${name}" ]; then
+if [ -z "${name}" ]; then
   usage
 fi
 
-source "${name}"
+if [ -f "${name}" ]; then
+  source "${name}"
+else
+  imagename="$(echo "${name//\//$''}")"
+  packages=("kernel.x86_64" "yum.noarch")
+fi
 
-if [ -z "${reponame}" ]; then
-  echo "Repository name does not exist, please specify 'reponame' in ${name}"
+if [ -z "${imagename}" ]; then
+  echo "Image name does not exist, please specify 'imagename' in ${name}"
   exit 11
 fi
 
@@ -77,7 +84,8 @@ target=$(mktemp -d --tmpdir $(basename $0).XXXXXX)
 
 set -x
 
-doimport=false
+#-------------------------------------------------------------------------------
+# Install packages
 
 if [ ! -z "${packages}" ]; then
   yum -c "${yumconf}" \
@@ -85,10 +93,12 @@ if [ ! -z "${packages}" ]; then
     --releasever=/ --setopt=tsflags=nodocs \
     --setopt=group_package_types=mandatory \
     -y install "${packages[@]}"
-  doimport=true
 else
-  echo "No yum packages configured for ${reponame}"
+  echo "No yum packages configured for ${imagename}"
 fi
+
+#-------------------------------------------------------------------------------
+# Install RPMs
 
 if [ ! -z "${rpms}" ]; then
   for file in "${rpms[@]}"
@@ -100,14 +110,16 @@ if [ ! -z "${rpms}" ]; then
         --releasever=/ --setopt=tsflags=nodocs \
         --setopt=group_package_types=mandatory \
         -y localinstall "${file}"
-      doimport=true
     else
       echo "Cannot find RPM file ${file}"
     fi
   done
 else
-  echo "No RPM file(s) configured for ${reponame}"
+  echo "No RPM file(s) configured for ${imagename}"
 fi
+
+#-------------------------------------------------------------------------------
+# Execute scripts
 
 if [ ! -z "${scripts}" ]; then
   for file in "${scripts[@]}"
@@ -120,15 +132,21 @@ if [ ! -z "${scripts}" ]; then
     fi
   done
 else
-  echo "No script file(s) configured for ${reponame}"
+  echo "No script file(s) configured for ${imagename}"
 fi
+
+#-------------------------------------------------------------------------------
+# Default network
 
 cat > "$target"/etc/sysconfig/network <<EOF
 NETWORKING=yes
 HOSTNAME=localhost.localdomain
 EOF
 
-if [ "${doimport}" == "true" ]; then
+#-------------------------------------------------------------------------------
+# Import and save image to output file
+
+if [ "${save}" == "true" ]; then
   yum -c "${yumconf}" --installroot="${target}" -y clean all
 
   rm -rf "$target"/usr/{{lib,share}/locale,{lib,lib64}/gconv,bin/localedef,sbin/build-locale-archive}
@@ -142,26 +160,22 @@ if [ "${doimport}" == "true" ]; then
   mkdir -p --mode=0755 "$target"/var/cache/ldconfig
 
   currentversion=$(docker images -q ${name}:${version})
-  if [ -z "${currentversion}" ]; then
-    echo "Importing ${reponame}:${version}"
-    tar --numeric-owner -c -C "${target}" . | docker import - ${reponame}:${version}
-  else
-    echo "Reimporting existing ${reponame}:${version}"
-    docker rmi ${reponame}:${version}
-    tar --numeric-owner -c -C "${target}" . | docker import - ${reponame}:${version}
+
+  if [ ! -z "${currentversion}" ]; then
+    echo "Removing existing ${imagename}:${version}"
+    docker rmi --force ${imagename}:${version}
   fi
 
-  docker run -i -t --rm ${reponame}:${version} /bin/bash -c 'echo success'
+  echo "Importing ${imagename}:${version}"
+  tar --numeric-owner -c -C "${target}" . | docker import - ${imagename}:${version}
 
-  echo "Working directory for image ${reponame}:${version}: ${target}"
+  docker run -i -t --rm ${imagename}:${version} /bin/bash -c 'echo success'
 
-  if [ "${save}" == "true" ]; then
-    echo "Saving docker ${reponame}:${version} to ${saveoutput}"
-    docker save ${reponame}:${version} | gzip > ${saveoutput}
-    #docker save -o ${saveoutput} ${reponame}:${version}
-  fi
+  echo "Saving docker ${imagename}:${version} to ${saveoutput}"
+  docker save ${imagename}:${version} | gzip > ${saveoutput}
+  #docker save -o ${saveoutput} ${imagename}:${version}
+
+  echo "Working directory for image ${imagename}:${version}: ${target}"
 else
-  rm -rf ${target}
-  echo "Nothing to do for ${reponame} @ ${name}"
-  exit 11
+  echo "Docker image file(s) are located ${target}"
 fi
